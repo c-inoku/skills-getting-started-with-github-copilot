@@ -55,7 +55,52 @@ document.addEventListener("DOMContentLoaded", () => {
           details.participants.forEach((p) => {
             const li = document.createElement("li");
             li.className = "participant-item";
-            li.textContent = p;
+
+            // Participant name/email
+            const span = document.createElement("span");
+            span.className = "participant-name";
+            span.textContent = p;
+
+            // Actions container (delete/unregister)
+            const actions = document.createElement("span");
+            actions.className = "participant-actions";
+
+            const del = document.createElement("button");
+            del.className = "delete-btn";
+            del.setAttribute("aria-label", `Unregister ${p} from ${name}`);
+            del.title = "Unregister";
+            del.textContent = "×"; // simple delete icon
+
+            // Click handler to unregister participant
+            del.addEventListener("click", async (e) => {
+              e.stopPropagation();
+              // Confirm quick action
+              const ok = confirm(`Unregister ${p} from ${name}?`);
+              if (!ok) return;
+
+              try {
+                const resp = await fetch(
+                  `/activities/${encodeURIComponent(name)}/participants?email=${encodeURIComponent(p)}`,
+                  { method: "DELETE" }
+                );
+
+                if (resp.ok) {
+                  // refresh activities to update UI and availability
+                  await fetchActivities();
+                } else {
+                  const data = await resp.json().catch(() => ({}));
+                  alert(data.detail || "Failed to unregister participant");
+                }
+              } catch (err) {
+                console.error("Error unregistering participant:", err);
+                alert("Failed to unregister participant. See console for details.");
+              }
+            });
+
+            actions.appendChild(del);
+
+            li.appendChild(span);
+            li.appendChild(actions);
             participantsList.appendChild(li);
           });
         } else {
@@ -101,11 +146,19 @@ document.addEventListener("DOMContentLoaded", () => {
 
       if (response.ok) {
         messageDiv.textContent = result.message;
-        messageDiv.className = "success";
+        // keep message styling and show success
+        messageDiv.className = "message success";
         signupForm.reset();
+
+        // Refresh activities so the new participant appears immediately
+        try {
+          await fetchActivities();
+        } catch (err) {
+          console.warn("Failed to refresh activities after signup:", err);
+        }
       } else {
         messageDiv.textContent = result.detail || "An error occurred";
-        messageDiv.className = "error";
+        messageDiv.className = "message error";
       }
 
       messageDiv.classList.remove("hidden");
